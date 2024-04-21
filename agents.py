@@ -282,7 +282,7 @@ class Agents():
                 Q_value = self.q_net(inputs) # (N,action_dim)
                 avail_actions = torch.tensor(np.array(avail_actions),dtype=torch.float32).to(self.device) # (N,action_dim)
                 Q_value[avail_actions == 0] = -float("inf")
-                actions = torch.argmax(Q_value,dim=-1).numpy() # (N,)
+                actions = torch.argmax(Q_value,dim=-1).to('cpu').numpy() # (N,)
             return actions
     
     def get_inputs(self,batch,max_episode_len):
@@ -293,7 +293,8 @@ class Agents():
         if self.args.use_agent_id:
             ids = torch.eye(self.args.N).unsqueeze(0).unsqueeze(0) # (1,1,N,N)
             ids = ids.repeat(self.args.batch_size,max_episode_len+1,1,1) # (batch_size,max_episode_len+1,N,N)
+            ids = ids.to(self.device)
             inputs.append(ids)
-        inputs = torch.cat([x for x in inputs],dim=-1).to(self.device) # (batch_size,max_episode_len+1,N,obs_dim+action_dim+N)
+        inputs = torch.cat([x for x in inputs],dim=-1) # (batch_size,max_episode_len+1,N,obs_dim+action_dim+N)
         return inputs
         
