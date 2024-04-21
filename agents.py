@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 from smac.env import StarCraft2Env
 import argparse
 import time
@@ -75,20 +76,25 @@ class Agents():
         
     def run(self):
         
-        while self.steps < self.args.max_steps:
+        with tqdm( total = self.args.max_steps, desc='Training' ) as pbar:
             
-            win, reward, episode_steps = self.run_one_episode()
-            self.steps +=  episode_steps
+            while self.steps < self.args.max_steps:
+                win, reward, episode_steps = self.run_one_episode()
+                self.steps +=  episode_steps
             
-            # Attention: if exists episode_length > 2*eval_freq, eval total times will be less than max_steps/eval_freq
-            if self.steps // self.args.eval_freq >= self.eval_times:
-                self.eval_times += 1
-                self.evaluate()
+                # Attention: if exists episode_length > 2*eval_freq, eval total times will be less than max_steps/eval_freq
+                if self.steps // self.args.eval_freq >= self.eval_times:
+                    self.eval_times += 1
+                    self.evaluate()
                 
-            if self.buffer.current_size > self.args.batch_size:
-                self.train()
+                if self.buffer.current_size > self.args.batch_size:
+                    self.train()
+                    
+                pbar.update(episode_steps)
                 
         self.evaluate()
+        self.writer.flush()
+        self.writer.close()
         self.env.close()
                 
     def run_one_episode(self,evaluate = False):
@@ -108,7 +114,6 @@ class Agents():
             
             epsilon = 0 if evaluate else self.args.epsilon
             actions = self.get_actions(obs,avail_actions,epsilon,last_actions) # (N,)
-            print("Actions: ",actions)
             last_actions = np.eye(self.args.action_dim)[actions] # (N,action_dim)
             reward, done, info = self.env.step(actions)
             episode_reward += reward
@@ -147,7 +152,8 @@ class Agents():
         win_rate = win_times / self.args.eval_episodes
         avg_reward = eval_reward / self.args.eval_episodes
         self.writer.add_scalar("win_rate_{}".format(self.args.map),win_rate,self.steps)
-        print("Steps: {}, Win Rate: {}, Average Reward: {}".format(self.steps,win_rate,avg_reward))
+        self.writer.add_scalar("avg_reward_{}".format(self.args.map),avg_reward,self.steps)
+        # print("Steps: {}, Win Rate: {}, Average Reward: {}".format(self.steps,win_rate,avg_reward))
             
     def train(self):
         self.train_times += 1
