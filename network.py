@@ -13,6 +13,7 @@ def orthogonal_init(layers, gain=1.0):
 class Q_Net(nn.Module):
     def __init__(self,args):
         super(Q_Net,self).__init__()
+        self.device = args.device
         
         self.fc1 = nn.Linear(args.input_dim,args.mlp_hidden_dim)
         self.fc2 = nn.Linear(args.mlp_hidden_dim,args.mlp_hidden_dim)
@@ -24,6 +25,7 @@ class Q_Net(nn.Module):
             orthogonal_init(self.fc3)
         
     def forward(self,x):
+        x = x
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = self.fc3(x)
@@ -32,6 +34,7 @@ class Q_Net(nn.Module):
 class Q_Net_RNN(nn.Module):
     def __init__(self,args):
         super(Q_Net_RNN,self).__init__()
+        self.device = args.device
         
         self.rnn_hidden = None
         self.fc1 = nn.Linear(args.input_dim,args.rnn_hidden_dim)
@@ -44,6 +47,7 @@ class Q_Net_RNN(nn.Module):
             orthogonal_init(self.fc2)
         
     def forward(self,x):
+        x = x
         x = torch.relu(self.fc1(x))
         self.rnn_hidden = self.rnn(x,self.rnn_hidden)
         x = self.fc2(self.rnn_hidden)
@@ -52,6 +56,7 @@ class Q_Net_RNN(nn.Module):
 class QMIX_Net(nn.Module):
     def __init__(self,args):
         super(QMIX_Net,self).__init__()
+        self.device = args.device
         
         self.hyper_w1 = nn.Sequential(nn.Linear(args.state_dim,args.hyper_hidden_dim),
                                       nn.ReLU(),
@@ -99,6 +104,7 @@ class QMIX_Net(nn.Module):
 class VDN_Net(nn.Module):
     def __init__(self,args):
         super(VDN_Net,self).__init__()
+        self.device = args.device
         
     def forward(self,x):
         x = torch.sum(x,dim=-1,keepdim=True)

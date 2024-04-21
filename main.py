@@ -34,7 +34,7 @@ if __name__ == '__main__':
     
     parser.add_argument("--use_last_action",type=bool,default=True,help="Use the last action as part of the state")
     parser.add_argument("--use_agent_id",type=bool,default=True,help="Use agent id as part of the state")
-    parser.add_argument("--map",type=str,default="3m",help="Map to run the agent on")
+    parser.add_argument("--map",type=str,default="2s3z",help="Map to run the agent on")
     args = parser.parse_args()
     
     army = Agents(args)
