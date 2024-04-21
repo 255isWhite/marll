@@ -40,6 +40,9 @@ class Agents():
             self.device = torch.device("cuda:0")
             args.device = self.device
             print("Using GPU: ",torch.cuda.get_device_name(0))
+            if torch.cuda.device_count() > 1:
+                print("Using {} GPUs".format(torch.cuda.device_count()))
+                gpu_ids = list(range(torch.cuda.device_count()))
         else :
             self.device = torch.device("cpu")
             args.device = self.device
@@ -56,19 +59,35 @@ class Agents():
         
         # Networks
         if args.use_rnn:
-            self.q_net = Q_Net_RNN(args)
-            self.target_q_net = Q_Net_RNN(args)
+            if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                self.q_net = nn.DataParallel(Q_Net_RNN(args),device_ids=gpu_ids)
+                self.target_q_net = nn.DataParallel(Q_Net_RNN(args),device_ids=gpu_ids)            
+            else:
+                self.q_net = Q_Net_RNN(args).to(self.device)
+                self.target_q_net = Q_Net_RNN(args).to(self.device)
         else:
-            self.q_net = Q_Net(args)
-            self.target_q_net = Q_Net(args)
+            if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                self.q_net = nn.DataParallel(Q_Net(args),device_ids=gpu_ids)
+                self.target_q_net = nn.DataParallel(Q_Net(args),device_ids=gpu_ids)
+            else:
+                self.q_net = Q_Net(args).to(self.device)
+                self.target_q_net = Q_Net(args).to(self.device)
         self.target_q_net.load_state_dict(self.q_net.state_dict())
             
         if args.alg == "QMIX":
-            self.mixer = QMIX_Net(args)
-            self.target_mixer = QMIX_Net(args)
+            if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                self.mixer = nn.DataParallel(QMIX_Net(args),device_ids=gpu_ids)
+                self.target_mixer = nn.DataParallel(QMIX_Net(args),device_ids=gpu_ids)
+            else:
+                self.mixer = QMIX_Net(args).to(self.device)
+                self.target_mixer = QMIX_Net(args).to(self.device)
         elif args.alg == "VDN":
-            self.mixer = VDN_Net(args)
-            self.target_mixer = VDN_Net(args)
+            if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                self.mixer = nn.DataParallel(VDN_Net(args),device_ids=gpu_ids)
+                self.target_mixer = nn.DataParallel(VDN_Net(args),device_ids=gpu_ids)
+            else:
+                self.mixer = VDN_Net(args).to(self.device)
+                self.target_mixer = VDN_Net(args).to(self.device)
         else:
             raise Exception("Algorithm not implemented")
         self.target_mixer.load_state_dict(self.mixer.state_dict())
@@ -251,7 +270,7 @@ class Agents():
                     agent_id = torch.eye(self.args.N) # (N,N)
                     inputs.append(agent_id)
                     
-                inputs = torch.cat([x for x in inputs],dim=-1).to(self.device) # (N,obs_dim+action_dim+N)
+                inputs = torch.cat([x for x in inputs],dim=-1) # (N,obs_dim+action_dim+N)
                 Q_value = self.q_net(inputs) # (N,action_dim)
                 avail_actions = torch.tensor(np.array(avail_actions),dtype=torch.float32) # (N,action_dim)
                 Q_value[avail_actions == 0] = -float("inf")
