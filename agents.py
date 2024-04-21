@@ -35,6 +35,15 @@ class Agents():
         if args.use_agent_id:
             args.input_dim += args.N
             print("Using Agent ID")
+            
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda:0")
+            args.device = self.device
+            print("Using GPU: ",torch.cuda.get_device_name(0))
+        else :
+            self.device = torch.device("cpu")
+            args.device = self.device
+            print("Using CPU")
         
         # argparse parameters transition
         args.epsilon_decay = (args.epsilon - args.epsilon_decay_final) / args.epsilon_decay_steps
@@ -242,7 +251,7 @@ class Agents():
                     agent_id = torch.eye(self.args.N) # (N,N)
                     inputs.append(agent_id)
                     
-                inputs = torch.cat([x for x in inputs],dim=-1) # (N,obs_dim+action_dim+N)
+                inputs = torch.cat([x for x in inputs],dim=-1).to(self.device) # (N,obs_dim+action_dim+N)
                 Q_value = self.q_net(inputs) # (N,action_dim)
                 avail_actions = torch.tensor(np.array(avail_actions),dtype=torch.float32) # (N,action_dim)
                 Q_value[avail_actions == 0] = -float("inf")

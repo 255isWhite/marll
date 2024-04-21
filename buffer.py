@@ -48,10 +48,10 @@ class Buffer:
         batch = {}
         for key in self.buffer.keys():
             if key=='obs' or key=='avail_actions' or key=='last_actions' or key=='state':
-                batch[key] = torch.tensor(self.buffer[key][index,:max_episode_len+1],dtype=torch.float32)
+                batch[key] = torch.tensor(self.buffer[key][index,:max_episode_len+1],dtype=torch.float32).to(self.args.device)
             elif key=='actions':
-                batch[key] = torch.tensor(self.buffer[key][index,:max_episode_len],dtype=torch.int64)
+                batch[key] = torch.tensor(self.buffer[key][index,:max_episode_len],dtype=torch.int64).to(self.args.device)
             else:
-                batch[key] = torch.tensor(self.buffer[key][index,:max_episode_len],dtype=torch.float32)
+                batch[key] = torch.tensor(self.buffer[key][index,:max_episode_len],dtype=torch.float32).to(self.args.device)
         
         return batch, max_episode_len
