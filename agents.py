@@ -61,7 +61,9 @@ class Agents():
         if args.use_rnn:
             if torch.cuda.is_available() and torch.cuda.device_count() > 1:
                 self.q_net = nn.DataParallel(Q_Net_RNN(args),device_ids=gpu_ids)
-                self.target_q_net = nn.DataParallel(Q_Net_RNN(args),device_ids=gpu_ids)            
+                self.target_q_net = nn.DataParallel(Q_Net_RNN(args),device_ids=gpu_ids)
+                self.q_net.to(self.device)
+                self.target_q_net.to(self.device)            
             else:
                 self.q_net = Q_Net_RNN(args).to(self.device)
                 self.target_q_net = Q_Net_RNN(args).to(self.device)
@@ -69,6 +71,8 @@ class Agents():
             if torch.cuda.is_available() and torch.cuda.device_count() > 1:
                 self.q_net = nn.DataParallel(Q_Net(args),device_ids=gpu_ids)
                 self.target_q_net = nn.DataParallel(Q_Net(args),device_ids=gpu_ids)
+                self.q_net.to(self.device)
+                self.target_q_net.to(self.device)
             else:
                 self.q_net = Q_Net(args).to(self.device)
                 self.target_q_net = Q_Net(args).to(self.device)
@@ -78,6 +82,8 @@ class Agents():
             if torch.cuda.is_available() and torch.cuda.device_count() > 1:
                 self.mixer = nn.DataParallel(QMIX_Net(args),device_ids=gpu_ids)
                 self.target_mixer = nn.DataParallel(QMIX_Net(args),device_ids=gpu_ids)
+                self.mixer.to(self.device)
+                self.target_mixer.to(self.device)
             else:
                 self.mixer = QMIX_Net(args).to(self.device)
                 self.target_mixer = QMIX_Net(args).to(self.device)
@@ -85,6 +91,8 @@ class Agents():
             if torch.cuda.is_available() and torch.cuda.device_count() > 1:
                 self.mixer = nn.DataParallel(VDN_Net(args),device_ids=gpu_ids)
                 self.target_mixer = nn.DataParallel(VDN_Net(args),device_ids=gpu_ids)
+                self.mixer.to(self.device)
+                self.target_mixer.to(self.device)
             else:
                 self.mixer = VDN_Net(args).to(self.device)
                 self.target_mixer = VDN_Net(args).to(self.device)
@@ -200,8 +208,8 @@ class Agents():
                 q_tar = self.target_q_net(inputs[:,i+1].reshape(-1,self.args.input_dim)) # (batch_size*N,input_dim) -> (batch_size*N,action_dim)
                 q_evals.append(q_eval.reshape(-1,self.args.N,self.args.action_dim)) # (batch_size,N,action_dim)
                 q_tars.append(q_tar.reshape(-1,self.args.N,self.args.action_dim)) # (batch_size,N,action_dim)
-            q_evals = torch.stack(q_evals,dim=1) # (batch_size,max_episode_len,N,action_dim)
-            q_tars = torch.stack(q_tars,dim=1) # (batch_size,max_episode_len,N,action_dim)
+            q_evals = torch.stack(q_evals,dim=1).to(self.device) # (batch_size,max_episode_len,N,action_dim)
+            q_tars = torch.stack(q_tars,dim=1).to(self.device) # (batch_size,max_episode_len,N,action_dim)
         else:
             q_evals = self.q_net(inputs[:,:-1]) # (batch_size,max_episode_len,N,action_dim)
             q_tars = self.target_q_net(inputs[:,1:]) # (batch_size,max_episode_len,N,action_dim)
@@ -212,10 +220,10 @@ class Agents():
             # do reshape just for rnn compatibility
             q_eval_last = self.q_net(inputs[:,-1].reshape(-1,self.args.input_dim)) # (batch_size*N,input_dim) -> (batch_size*N,action_dim)
             q_eval_last = q_eval_last.reshape(-1,1,self.args.N,self.args.action_dim) # (batch_size,N,action_dim)
-            q_evals_next = torch.cat([q_evals[:,1:],q_eval_last],dim=1) # (batch_size,max_episode_len,N,action_dim)
+            q_evals_next = torch.cat([q_evals[:,1:],q_eval_last],dim=1).to(self.device) # (batch_size,max_episode_len,N,action_dim)
             q_evals_next[batch['avail_actions'][:,1:] == 0] = -float("inf")
-            arg_action_index = torch.argmax(q_evals_next,dim=-1,keepdim=True) # (batch_size,max_episode_len,N,1)
-            q_tars = torch.gather(q_tars,dim=-1,index=arg_action_index).squeeze(-1) # (batch_size,max_episode_len,N)
+            arg_action_index = torch.argmax(q_evals_next,dim=-1,keepdim=True).to(self.device) # (batch_size,max_episode_len,N,1)
+            q_tars = torch.gather(q_tars,dim=-1,index=arg_action_index).squeeze(-1).to(self.device) # (batch_size,max_episode_len,N)
             
             # Normal DQN
             # q_tars[batch['avail_actions'][:,1:] == 0] = 0
@@ -270,9 +278,9 @@ class Agents():
                     agent_id = torch.eye(self.args.N) # (N,N)
                     inputs.append(agent_id)
                     
-                inputs = torch.cat([x for x in inputs],dim=-1) # (N,obs_dim+action_dim+N)
+                inputs = torch.cat([x for x in inputs],dim=-1).to(self.device) # (N,obs_dim+action_dim+N)
                 Q_value = self.q_net(inputs) # (N,action_dim)
-                avail_actions = torch.tensor(np.array(avail_actions),dtype=torch.float32) # (N,action_dim)
+                avail_actions = torch.tensor(np.array(avail_actions),dtype=torch.float32).to(self.device) # (N,action_dim)
                 Q_value[avail_actions == 0] = -float("inf")
                 actions = torch.argmax(Q_value,dim=-1).numpy() # (N,)
             return actions
@@ -286,6 +294,6 @@ class Agents():
             ids = torch.eye(self.args.N).unsqueeze(0).unsqueeze(0) # (1,1,N,N)
             ids = ids.repeat(self.args.batch_size,max_episode_len+1,1,1) # (batch_size,max_episode_len+1,N,N)
             inputs.append(ids)
-        inputs = torch.cat([x for x in inputs],dim=-1) # (batch_size,max_episode_len+1,N,obs_dim+action_dim+N)
+        inputs = torch.cat([x for x in inputs],dim=-1).to(self.device) # (batch_size,max_episode_len+1,N,obs_dim+action_dim+N)
         return inputs
         
